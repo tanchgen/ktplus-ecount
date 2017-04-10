@@ -43,7 +43,7 @@ int isrInit( void ){
   EXTI_Init(&isr_EXTI_InitStructure);
 
   NVIC_EnableIRQ( EXTI9_5_IRQn );
-  NVIC_SetPriority( EXTI9_5_IRQn, 3);
+  NVIC_SetPriority( EXTI9_5_IRQn, 4);
 
 
   return rc;
@@ -154,11 +154,37 @@ int32_t i32ToAde( int32_t vol ){
 }
 
 eAdeState adeIrqHandler( void ){
-  // TODO: Чтение регистра флагов прерывания ADE
+  uint32_t irqState;
+  // Чтение регистра флагов прерывания ADE
+  recvAde( IRQSTATA_32, &irqState, 4 );
+  while( rxCplt != SET )
+  {}
 
   // TODO: Обработка всех прерываний ADE
+  if( irqState & IRQENA_Reset ) {
+    adeState = ADE_READY;
+  }
+  else if( irqState & IRQENA_OIA ) {
+    // Отправить сообщение на сарвер
+    // XXX: Пересчитать величину ade.oilvl в Амперы
+    canSendMsg( CUR_MAX, ade.oilvl );
+    // TODO: Выставить управляющий защитой пин в 1
+  }
+  else if( irqState & IRQENA_OV ) {
+    // Отправить сообщение на сарвер
+    // XXX: Пересчитать величину ade.ovlvl в Вольты
+    canSendMsg( VOLT_MAX, ade.ovlvl );
+    // TODO: Выставить управляющий защитой пин в 1
+  }
+  else if( irqState & IRQENA_AEHFA ) {
+    int32_t aenrg;
+    // Отправить сообщение на сарвер
+    // XXX: Пересчитать величину ade.oilvl в Амперы
+    recvAde( AENERGYA_32, spiRxBuf );
+  }
 
-  // TODO: Сброс флагов прерываний
+  // Сброс флагов прерываний
+  recvAde( RSTIRQSTATA_32, irqState);
 
   return ADE_READY;
 }

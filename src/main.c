@@ -43,9 +43,9 @@ int main(int argc, char* argv[]) {
 
   rtcSetup();
 
-  adeInit();
+ // canInit();
 
-  canInit();
+  adeInit();
 
   myDelay( 1000 );
   

@@ -159,6 +159,7 @@ void dmaTxInit(uint8_t * txdata, uint16_t size) {
   DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, ENABLE);
   // Включаем прерывание
   NVIC_EnableIRQ(DMA1_Channel5_IRQn);
+  NVIC_SetPriority( DMA1_Channel5_IRQn, 2 );
 }
 
 void dmaRxInit(uint8_t * rxdata, uint16_t size) {
@@ -197,6 +198,7 @@ void dmaRxInit(uint8_t * rxdata, uint16_t size) {
   DMA_ITConfig(DMA1_Channel4, DMA_IT_TC, ENABLE);
   // Включаем прерывание
   NVIC_EnableIRQ(DMA1_Channel4_IRQn);
+  NVIC_SetPriority( DMA1_Channel4_IRQn, 2 );
 }
 
 void DMA1_Channel4_IRQHandler(void) {
