@@ -21,7 +21,9 @@ src/spi.o: ../src/spi.c \
  /home/jet/workspace/count.spi.f1/system/include/stm32f1-stdperiph/stm32f10x_tim.h \
  /home/jet/workspace/count.spi.f1/system/include/stm32f1-stdperiph/stm32f10x_usart.h \
  /home/jet/workspace/count.spi.f1/system/include/stm32f1-stdperiph/misc.h \
- ../src/main.h ../src/spi.h /home/jet/workspace/count.spi.f1/inc/buffer.h
+ ../src/main.h /home/jet/workspace/count.spi.f1/inc/ade.h \
+ /home/jet/workspace/count.spi.f1/inc/ade7953.h ../src/spi.h \
+ /home/jet/workspace/count.spi.f1/inc/buffer.h
 
 /home/jet/workspace/count.spi.f1/system/include/cmsis/stm32f10x.h:
 
@@ -68,6 +70,10 @@ src/spi.o: ../src/spi.c \
 /home/jet/workspace/count.spi.f1/system/include/stm32f1-stdperiph/misc.h:
 
 ../src/main.h:
+
+/home/jet/workspace/count.spi.f1/inc/ade.h:
+
+/home/jet/workspace/count.spi.f1/inc/ade7953.h:
 
 ../src/spi.h:
 

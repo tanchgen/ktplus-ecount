@@ -22,6 +22,10 @@
 #define ISR_PORT_NUM    0 // GPIOA
 #define ISR_EXTI_LINE   EXTI_Line9
 
+#define CTRL_PIN         GPIO_Pin_8
+#define CTRL_PORT        GPIOA
+#define CTRL_PIN_NUM     8
+
 typedef enum {
   ADE_OK,
   ADE_STOP,
@@ -55,4 +59,6 @@ extern uint8_t txBuf[];
 
 eAdeState adeInit( void );
 eAdeState sendAde( uint16_t addr, uint8_t data[], uint8_t len );
+eAdeState recvAde( uint16_t addr, uint8_t * data, uint8_t len );
+eAdeState adeIrqHandler( void );
 #endif /* ADE_H_ */

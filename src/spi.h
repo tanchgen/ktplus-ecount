@@ -32,5 +32,6 @@ void dmaRxInit( uint8_t * rxdata, uint16_t size );
 void dmaTxInit( uint8_t * txdata, uint16_t size );
 void SPI_Receive(uint8_t *data, uint16_t size);
 void SPI_Transmit(uint8_t *data, uint16_t size);
+void SPI_TransRecv( uint8_t * txData, uint8_t * rxData, uint8_t len );
 
 #endif /* SPI_H_ */

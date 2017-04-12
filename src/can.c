@@ -235,9 +235,9 @@ void canTxIrqHandler(void) {
 	if ((CAN_GetITStatus(CAN1, CAN_IT_TME)))
 	{
 		CAN_ClearITPendingBit(CAN1, CAN_IT_TME);
-// TODO: Если есть сообщение для отправки - отправить его
-
+		// Если есть сообщение для отправки - отправить его
 		if (  readBuff( &canTxBuf, (uint8_t *)&TxMessage) ) {
+	    // Если есть сообщение для отправки - отправить его
 			CAN_Transmit(CAN1, &TxMessage);
 		}
 	}
