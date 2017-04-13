@@ -103,7 +103,7 @@ eAdeState adeSetup( void ){
   data.u8d = 0xAD;
   sendAde( UNLOCK_REG_8, &(data.u8d), 1 );
   data.u16d = 0x30;
-  sendAde( SETUP_REG_16, (uint8_t *)&(data.u16d), 1 );
+  sendAde( SETUP_REG_16, (uint8_t *)&(data.u16d), 2 );
 
   // Установка предварительного усиления
   data.u32d = 0;

@@ -294,6 +294,12 @@ void canProcess( void ){
   			break;
       case WATT_MAX:         // Максимум потребляемой мощности
         // TODO: Установка границы максимальной потребляемой мощности
+        // Читаем Предел напряжения
+        recvAde( OVLVL_32, regVal, 4);
+        ade.maxWatt = *((uint32_t *)&rxMessage.Data);
+        // Вычисляем Максимальный ток
+        regVal = ade.maxWatt/( regVal/1.2);
+        sendAde( OILVL_32, regVal, 4);
         break;
 
       case TIME:

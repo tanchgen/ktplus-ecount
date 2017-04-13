@@ -57,6 +57,8 @@ typedef struct {
 extern uint8_t rxBuf[];
 extern uint8_t txBuf[];
 
+extern tAde ade;
+
 eAdeState adeInit( void );
 eAdeState sendAde( uint16_t addr, uint8_t data[], uint8_t len );
 eAdeState recvAde( uint16_t addr, uint8_t * data, uint8_t len );

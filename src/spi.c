@@ -7,8 +7,8 @@
 #include "buffer.h"
 
 
-#define DMA_TX_ON 0
-#define DMA_RX_ON 0
+#define DMA_TX_ON 1
+#define DMA_RX_ON 1
 
 uint8_t testBuf[BUF_SIZE];
 
@@ -89,6 +89,8 @@ int spiInit(void) {
 #endif
   SPI_Cmd(SPI2, ENABLE); // Включаем модуль SPI1....
 
+  txCplt = SET;
+  rxCplt = SET;
   return 0;
 }
  
@@ -104,6 +106,7 @@ void SPI2_IRQHandler (void) {
     if( iRx == rxSize ){
       rxCplt = SET;
       iRx = 0;
+      SPI_I2S_ITConfig(SPI2,SPI_I2S_IT_RXNE,DISABLE); //Выключаем прерывание по приему байта
     }
   }
 #endif
@@ -208,7 +211,7 @@ void DMA1_Channel4_IRQHandler(void) {
     DMA1_Channel4->CCR &= ~DMA_CCR1_EN;
 
     // Clear Transfer Complete IT Flag
-    DMA1->IFCR = DMA1_IT_TC4;
+    DMA1->IFCR = (DMA1_IT_GL4 | DMA1_IT_TC4 | DMA1_IT_HT4 | DMA1_IT_TE4 );
     rxCplt = SET;
   }
  
@@ -235,7 +238,11 @@ void DMA1_Channel5_IRQHandler(void) {
 
 
 void SPI_Receive(uint8_t *data, uint16_t size) {
-//  GPIO_ResetBits(GPIOA, GPIO_Pin_4);
+
+  // Ждем, пока предыдущий сеанс не закончится
+  while( (txCplt != SET) && (rxCplt != SET) )
+  {}
+
   rxCplt = RESET;
   DMA1_Channel4->CMAR = (uint32_t)data;
   DMA1_Channel4->CNDTR = size;
@@ -245,8 +252,11 @@ void SPI_Receive(uint8_t *data, uint16_t size) {
 }
 
 void SPI_Transmit(uint8_t *data, uint16_t size) {
-//  GPIO_ResetBits(GPIOA, GPIO_Pin_4);
-//  SPI_I2S_ITConfig(SPI2,SPI_I2S_IT_RXNE,DISABLE); //Выключаем прерывание по приему байта
+
+  // Ждем, пока предыдущий сеанс не закончится
+  while( (txCplt != SET) && (rxCplt != SET) )
+  {}
+
   // Для начала инициализируем прием через DMA
   txCplt = RESET;
 #if DMA_TX_ON
@@ -268,15 +278,32 @@ void SPI_Transmit(uint8_t *data, uint16_t size) {
 #endif
 }
 
+
 void SPI_TransRecv( uint8_t * txData, uint8_t * rxData, uint8_t len ){
+  // Ждем, пока предыдущий сеанс не закончится
+  while( (txCplt != SET) && (rxCplt != SET) )
+  {}
+
   rxCplt = RESET;
+  txCplt = RESET;
+#if (DMA_RX_ON & DMA_TX_ON)
   DMA1_Channel4->CMAR = (uint32_t)rxData;
   DMA1_Channel4->CNDTR = len;
   DMA_Cmd(DMA1_Channel4, ENABLE);
-  txCplt = RESET;
   DMA1_Channel5->CMAR = (uint32_t)txData;
   DMA1_Channel5->CNDTR = len;
   DMA_Cmd(DMA1_Channel5, ENABLE);
+
+  // Включаем прерывание на RX
+  DMA_ITConfig(DMA1_Channel4, DMA_IT_TC, ENABLE);
+  // Включаем прерывание на TX
+  DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, ENABLE);
+
   // Начинаем передачу-прием
   SPI2->CR2 |= (SPI_CR2_TXDMAEN | SPI_CR2_RXDMAEN);
+#else
+  // TODO: Описать передачу-прием без DMA
+  SPI_I2S_ITConfig(SPI2, SPI_I2S_IT_RXNE, ENABLE); //Включаем прерывание по приему байта
+  SPI_I2S_ITConfig(SPI2, SPI_I2S_IT_TXE, ENABLE); //Включаем прерывание по передаче байта
+#endif
 }
