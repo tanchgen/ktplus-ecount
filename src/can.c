@@ -18,7 +18,7 @@
 #define CIRCUIT			COLD
 
 // Преобразование 32-х битное со знаком в 24-х битное со знаком
-int32_t	i32ToAde( int32_t );
+//int32_t	i32ToAde( int32_t );
 void getIdList( tCanId *canid, uint32_t extId);
 
 void canCoreInit( void ){
@@ -277,16 +277,18 @@ void canProcess( void ){
       int32_t regVal;
       uint16_t regAddr;
 
-  		case IGAIN_A:           // Коэффициент усиления вход тока - Фаза A
-      case VGAIN_A:           // Коэффициент усиления вход напряжения - Фаза A
+  		case WGAIN_A:           // Коэффициент усиления вход тока - Фаза A
 #ifdef ADE7878
+// Переделать адреса для регистров 3-фазного
       case IGAIN_B:           // Коэффициент усиления вход тока - Фаза B
       case VGAIN_B:           // Коэффициент усиления вход напряжения - Фаза B
       case IGAIN_C:           // Коэффициент усиления вход тока - Фаза C
       case VGAIN_C:           // Коэффициент усиления вход напряжения - Фаза C
 #endif
-        regAddr = canid.msgId - IGAIN_A + AIGAIN_32;
-  		  regVal = i32ToAde( *((int32_t *)&rxMessage.Data) );
+        regAddr = AWGAIN_32;
+        // 0.1% = 4194 ед,
+        // 0x400000 - WGAIN = 1, 0x200000 - WGAIN = -50%, 0x600000 - WGAIN = +50%,
+  		  regVal = ((*((int32_t *)&rxMessage.Data) ) * 4194) + 0x400000;
   		  sendAde( regAddr, (uint8_t *)&regVal, 4 );
   		  break;
       case WATT_SEND_TOUT:    // Интервал отправки данных
@@ -295,11 +297,12 @@ void canProcess( void ){
       case WATT_MAX:         // Максимум потребляемой мощности
         // TODO: Установка границы максимальной потребляемой мощности
         // Читаем Предел напряжения
-        recvAde( OVLVL_32, regVal, 4);
+        recvAde_s( OVLVL_32, (uint8_t *)&regVal, 4);
         ade.maxWatt = *((uint32_t *)&rxMessage.Data);
         // Вычисляем Максимальный ток
         regVal = ade.maxWatt/( regVal/1.2);
-        sendAde( OILVL_32, regVal, 4);
+        regVal *= K_W;
+        sendAde( OILVL_32, (uint8_t *)&regVal, 4);
         break;
 
       case TIME:

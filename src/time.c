@@ -14,6 +14,7 @@
 #include <main.h>
 #include "stm32f10x.h"
 #include "stm32f10x_it.h"
+#include "ade.h"
 #include "my_time.h"
 
 volatile timer_ticks_t timer_delayCount;
@@ -273,6 +274,7 @@ void timersProcess( void ) {
 	// Секундный таймер
 	if ( sysRtc.SecFlag ) {
 		sysRtc.SecFlag = RESET;
+		adeSecondProcess();
 		// Симуляция водомера
 //		flowGetVolume();
 //		flowSecondProcess();

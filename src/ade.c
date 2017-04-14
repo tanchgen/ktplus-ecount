@@ -77,13 +77,17 @@ eAdeState adeInit( void ){
   while( adeState != ADE_READY){
     if( sTick > tout ){
       break;
+// TODO: Вернуть "Выход с ошибкой по тайматуту"
 //      return adeState;
     }
   }
   memset( (uint8_t*)&ade, 0, sizeof(tAde) );
-  ade.tPerWatt = 1;
-  ade.tPerSend = 60;
-
+  ade.tWatt = 1;
+  ade.tWattCount = ade.tWatt;
+  ade.tSend = 60;
+  ade.tSendCount = ade.tSend;
+  ade.tEnergy = 15;
+  ade.tEnergyCount = ade.tEnergy;
   adeCtrlInit();
   adeState = adeSetup();
 
@@ -106,28 +110,30 @@ eAdeState adeSetup( void ){
   sendAde( SETUP_REG_16, (uint8_t *)&(data.u16d), 2 );
 
   // Установка предварительного усиления
-  data.u32d = 0;
-  sendAde( AIGAIN_32, (uint8_t *)&(data.u32d), 4 );
-  sendAde( AVGAIN_32, (uint8_t *)&(data.u32d), 4 );
-  ade.awgain = 0;
-  sendAde( AWGAIN_32, (uint8_t *)&(ade.awgain), 4 );
+  data.u8d = 1;         // Коэффициент уселителя на входе (1, 2, 4, 8, 16, 22)
+  sendAde( PGA_V_8, (uint8_t *)&(data.u8d), 1 );
+  sendAde( PGA_IA_8, (uint8_t *)&(data.u8d), 1 );
+//  ade.awgain = data.u32d;        // No gain calibration (Minimum = 0x2000000 = -50%)
+//  sendAde( AWGAIN_32, (uint8_t *)&(ade.awgain), 4 );
 
   // Установка MAX тока и напряжения
   recvAde( RSTVPEAK_32, (uint8_t *)&(data.u32d), 4 );
   recvAde( RSTIAPEAK_32, (uint8_t *)&(data.u32d), 4);
   for( uint8_t i = 0; i < 10; i++ ) {
     myDelay(100);
-    recvAde( VPEAK_32, (uint8_t *)&(data.u32d), 4 );
+    recvAde_s( VPEAK_32, (uint8_t *)&(data.u32d), 4 );
     if( ade.ovlvl < data.u32d ){
       ade.ovlvl = data.u32d;
     }
-    recvAde( IAPEAK_32, (uint8_t *)&(data.u32d), 4 );
+    recvAde_s( IAPEAK_32, (uint8_t *)&(data.u32d), 4 );
     if( ade.oilvl < data.u32d ){
       ade.oilvl = data.u32d;
     }
   }
   ade.ovlvl = (ade.ovlvl * 12) / 10;
+  sendAde( OVLVL_32, (uint8_t *)ade.ovlvl, 4);
   ade.oilvl = (ade.oilvl * 12) / 10;
+  sendAde( OILVL_32, (uint8_t *)ade.oilvl, 4);
 
   /* ----- Установка IRQ --------
    * IOA - Максимальный ток
@@ -180,6 +186,22 @@ eAdeState recvAde( uint16_t addr, uint8_t * data, uint8_t len ){
   return ADE_OK;
 }
 
+eAdeState recvAde_s( uint16_t addr, uint8_t * data, uint8_t len ){
+  eAdeState rc;
+  uint32_t tout = sTick + 100;
+
+  if( (rc = recvAde( addr, data, len )) != ADE_OK ){
+    return rc;
+  }
+
+  while( rxCplt != SET ){
+    if( sTick > tout ){
+      return ADE_ERR;
+    }
+  }
+  return ADE_OK;
+}
+
 int32_t i32ToAde( int32_t vol ){
 
   vol &= ~(0xFF000000);
@@ -195,37 +217,109 @@ int32_t i32ToAde( int32_t vol ){
 eAdeState adeIrqHandler( void ){
   uint32_t irqState;
   // Чтение регистра флагов прерывания ADE
-  recvAde( IRQSTATA_32, (uint8_t *)&irqState, 4 );
-  while( rxCplt != SET )
-  {}
+  recvAde_s( IRQSTATA_32, (uint8_t *)&irqState, 4 );
 
   // Обработка всех прерываний ADE
   if( irqState & IRQENA_Reset ) {
     adeState = ADE_READY;
   }
   else if( irqState & IRQENA_OIA ) {
+    uint32_t tmpI;
     // Отправить сообщение на сарвер
-    // XXX: Пересчитать величину ade.oilvl в Амперы
-    canSendMsg( CUR_MAX, ade.oilvl );
+    tmpI = recvI();
+    canSendMsg( CUR_MAX, tmpI );
     // Выставить управляющий защитой пин в 1
     CTRL_PORT->BSRR |= CTRL_PIN;
   }
   else if( irqState & IRQENA_OV ) {
+    uint32_t tmpV;
     // Отправить сообщение на сарвер
-    // XXX: Пересчитать величину ade.ovlvl в Вольты
-    canSendMsg( VOLT_MAX, ade.ovlvl );
+    tmpV = recvV();
+    canSendMsg( VOLT_MAX, tmpV );
     // Выставить управляющий защитой пин в 1
     CTRL_PORT->BSRR |= CTRL_PIN;
   }
   else if( irqState & IRQENA_AEHFA ) {
     // Отправить сообщение на сарвер
-    // XXX: Пересчитать величину ade.oilvl в Амперы
-    recvAde( AENERGYA_32, spiRxBuf, 4 );
+    ade.tEnergyCount = ade.tEnergy;
+    ade.enrgDay += recvE();
   }
 
   // Сброс флагов прерываний
   recvAde( RSTIRQSTATA_32, (uint8_t *)&irqState, 4);
 
   return ADE_READY;
+}
+
+eAdeState adeSecondProcess( void ) {
+  if( --ade.tWattCount == 0 ){
+    ade.tWattCount = ade.tWatt;
+    // Получаем значение мощьности
+    ade.watt = recvW();
+    if(ade.watt > ade.maxWattMon){
+      ade.maxWattMon = ade.watt;
+    }
+  }
+  if( --ade.tSendCount == 0 ){
+    ade.tSendCount = ade.tSend;
+    // Отправляем в S207 значение мощьности
+    canSendMsg( AWATT_NOW, ade.watt );
+  }
+  if( --ade.tEnergyCount == 0 ){
+    ade.tEnergyCount = ade.tEnergy;
+    ade.enrgDay += recvE();
+  }
+  if( sysRtc.DayFlag == SET ) {
+    // TODO: Отправить значение потребленной энергии сначала за сутки
+    canSendMsg( AENRG_DAY, ade.enrgDay );
+    ade.enrgMon += ade.enrgDay;
+    ade.enrgDay = 0;
+    canSendMsg( AENRG_MON, ade.enrgMon );
+    if( sysRtc.MonthFlag == SET ){
+      canSendMsg( AENRG_MON, ade.enrgMon );
+      ade.enrgYear += ade.enrgMon;
+      ade.enrgMon = 0;
+      canSendMsg( AWATT_MON_MAX, ade.maxWattMon);
+      ade.maxWattMon = 0;
+    }
+  }
+
+  return ADE_READY;
+}
+
+uint32_t recvV( void ){
+  uint32_t tmpV;
+  if( recvAde_s( VRMS_32, (uint8_t *)&tmpV, 4 ) != ADE_OK ){
+    return 0;
+  }
+  tmpV /= K_V;
+  return tmpV;
+}
+
+uint32_t recvI( void ){
+  uint32_t tmpI;
+  if( recvAde_s( IRMSA_32, (uint8_t *)&tmpI, 4 ) != ADE_OK ){
+    return 0;
+  }
+  tmpI /= K_I;
+  return tmpI;
+}
+
+uint32_t recvW( void ){
+  uint32_t tmpW;
+  if( recvAde_s( AWATT_32, (uint8_t *)&tmpW, 4 ) != ADE_OK ){
+    return 0;
+  }
+  tmpW /= K_W;
+  return tmpW;
+}
+
+uint32_t recvE( void ){
+  uint32_t tmpE;
+  if( recvAde_s( AENERGYA_32, (uint8_t *)&tmpE, 4 ) != ADE_OK ){
+    return 0;
+  }
+  tmpE /= K_W;
+  return tmpE;
 }
 

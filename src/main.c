@@ -29,6 +29,8 @@ int main(int argc, char* argv[]) {
   (void)argc;
   (void)argv;
 
+  eAdeState st;
+
   sTick = 0;
   uxTime = 1491037200;      // Unix Time = 01.04.2017г., 09:00:00
 
@@ -41,14 +43,17 @@ int main(int argc, char* argv[]) {
 
   SysTick_Config (SystemCoreClock / TIMER_FREQUENCY_HZ);
 
-  rtcSetup();
+ // rtcSetup();
 
  // canInit();
 
-  adeInit();
+  st = adeInit();
+  while( st != ADE_READY ) {
+    myDelay( 1000 );
 
-  myDelay( 1000 );
-  
+
+  }
+
   // Infinite loop
   while(1) {
     timersProcess();
