@@ -5,13 +5,13 @@
 
 // ----------------------------------------------------------------------------
 
+#include <spi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "diag/Trace.h"
 
 #include "Timer.h"
 #include "main.h"
-#include "spi.h"
 #include "ade.h"
 #include "can.h"
 #include "buffer.h"
@@ -24,6 +24,8 @@ uint8_t txCplt = FALSE;
 
 // ----- main() ---------------------------------------------------------------
 
+void uartInit( void );
+void uartProcess( void );
 
 int main(int argc, char* argv[]) {
   (void)argc;
@@ -43,10 +45,11 @@ int main(int argc, char* argv[]) {
 
   SysTick_Config (SystemCoreClock / TIMER_FREQUENCY_HZ);
 
- // rtcSetup();
+  rtcSetup();
 
- // canInit();
+  canInit();
 
+  uartInit();
   st = adeInit();
   while( st != ADE_READY ) {
     myDelay( 1000 );
@@ -59,7 +62,7 @@ int main(int argc, char* argv[]) {
     timersProcess();
     canProcess();
 //  TODO: UART: Обработка принятых и передача подготовленных сообщений
-//    uartProcess();
+    uartProcess();
   }
   // Infinite loop, never return.
 }

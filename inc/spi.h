@@ -8,6 +8,8 @@
 #ifndef SPI_H_
 #define SPI_H_
 
+#include <stdint.h>
+
 #define BUF_SIZE    511
 #define SPI_LEN      7
 

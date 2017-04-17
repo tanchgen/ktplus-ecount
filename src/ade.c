@@ -5,13 +5,13 @@
  *      Author: G.Tanchin <g.tanchin@yandex.ru>
  */
 
+#include <spi.h>
 #include "string.h"
 #include "stm32f10x.h"
 
 #include "main.h"
 #include "my_time.h"
 #include "buffer.h"
-#include "spi.h"
 #include "can.h"
 #include "ade.h"
 

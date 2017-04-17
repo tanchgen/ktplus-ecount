@@ -1,9 +1,9 @@
+#include <spi.h>
 #include <string.h>
 #include "stm32f10x.h"
 
 #include "main.h"
 #include "ade.h"
-#include "spi.h"
 #include "buffer.h"
 
 

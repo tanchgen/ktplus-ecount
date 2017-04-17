@@ -368,3 +368,28 @@ void getIdList( tCanId *canid, uint32_t extId){
 	canid->s207 = (extId & S207_MASK) >> 20;
 	canid->devId = (extId & DEV_ID_MASK);
 }
+
+// Для тестов
+void canRecvSimMsg( eMessId msgId, uint32_t data ) {
+  CanTxMsg canTxMsg;
+  tCanId canId;
+  // Формируем структуру canId
+
+  canId.devId = selfDevId;
+
+  canId.adjCur = ADJ;
+  canId.msgId = msgId;
+  canId.coldHot = 1;
+  canId.s207 = S207_DEV;
+
+  // Для всех, кроме температуры, беззнаковое 32-х битное целое
+  *((uint32_t *)canTxMsg.Data) = data;
+  canTxMsg.DLC = 4;
+
+  canTxMsg.ExtId = setIdList( &canId );
+  canTxMsg.IDE = CAN_Id_Extended;
+  canTxMsg.RTR = 0;
+  canTxMsg.StdId = 0;
+
+  writeBuff( &canRxBuf, (uint8_t *)&canTxMsg );
+}
