@@ -53,9 +53,10 @@ const struct _param {
 					  {"VOLTMAX", 7}          // Максимальное напряжение в цепи
 };
 
-void canRecvSimMsg( eMessId msgId, uint32_t data );
+void canRecvSimMsg( eMsgId msgId, uint32_t data );
 uint8_t mqttTopCoder( uint8_t * top, CanTxMsg * can );
 uint8_t mqttMsgCoder( uint8_t * msg, CanTxMsg *can);
+int msgParse( uint8_t * pMsg );
 
 void uartInit( void ){
 	GPIO_InitTypeDef port;
@@ -119,7 +120,7 @@ void USART1_IRQHandler()
     {
     	uint8_t ch = USART1->DR;
     	if( ch == '\n'){
-    		rxFin = 1;
+    		rxFin = SET;
     	}
     	writeBuff( &rxUartBuf, &ch );
       USART_ClearITPendingBit(USART1, USART_IT_RXNE);
@@ -131,13 +132,14 @@ void uartProcess( void ){
 
 	if( rxFin ){
 		in[0] = 0;
-		rxFin = 0;
+		rxFin = RESET;
 		for( uint8_t i=0; i< 32; i++){
 			readBuff( &rxUartBuf, &in[i]);
 			if( in[i] == '\n'  ){
 				break;
 			}
 		}
+		msgParse( in );
 		// TODO: Декодирование принятого по UART сообщения
 //		newTime = (uTime_t)atol( (char *)in );
 //		canRecvSimMsg( TIME, newTime );
@@ -210,7 +212,7 @@ uint8_t mqttTopCoder( uint8_t * top, CanTxMsg * can ){
 
 
 uint8_t mqttMsgCoder( uint8_t * msg, CanTxMsg *can) {
-	eMessId msgId;
+	eMsgId msgId;
 	uint8_t tmpMsg[80];
 	uint8_t * pTmp = tmpMsg;
 	uint8_t * tmpdata;
@@ -243,7 +245,7 @@ uint8_t mqttMsgCoder( uint8_t * msg, CanTxMsg *can) {
 	return strlen((char *)msg);
 }
 
-int getFild( char *dst, char ** msg, char termin ){
+int getFild( uint8_t *dst, uint8_t ** msg, uint8_t termin ){
   uint8_t i;
 
 /*
@@ -251,7 +253,7 @@ int getFild( char *dst, char ** msg, char termin ){
     (*msg)++;
   }
 */
-  for( i=0; (**msg != '\0') && (**msg != ';') ; i++ ){
+  for( i=0; (**msg != '\0') && (**msg != '\n') ; i++ ){
     if( **msg == termin ){
       (*msg)++;
       break;
@@ -260,10 +262,10 @@ int getFild( char *dst, char ** msg, char termin ){
   }
   dst[i] = '\0';
 
-  return strlen(dst);
+  return strlen((char *)dst);
 }
 
-int oneRec( char **pMsg, char * pat, char * pva ){
+int oneRec( uint8_t **pMsg, uint8_t * pat, uint8_t * pva ){
   *pat = '\0';
   *pva = '\0';
 
@@ -275,17 +277,17 @@ int oneRec( char **pMsg, char * pat, char * pva ){
   return 0;
 }
 
-int msgParse( char * pMsg ){
-  char atBuf[32];
+int msgParse( uint8_t * pMsg ){
+  uint8_t atBuf[32];
 //  char *patBuf = atBuf;
-  char vaBuf[16];
+  uint8_t vaBuf[16];
 
-  while( (*pMsg != 0) && (*pMsg != ';') ){
+  while( (*pMsg != 0) && (*pMsg != '\n') ){
     uint8_t fildNum = 0;
 
     fildNum = oneRec( &pMsg, atBuf, vaBuf );
     if( fildNum == 2 ){
-      uint8_t i;
+      eMsgId i;
       for( i = 0; i < PARAM_NB; i++ ){
         if( memcmp( atBuf, param[i].name, param[i].len ) == 0 ){
           break;
@@ -296,7 +298,7 @@ int msgParse( char * pMsg ){
       }
       i += 15;
 
-      canRecvSimMsg( i, atol(vaBuf) );
+      canRecvSimMsg( i, atol((char*)vaBuf) );
 
     }
   }

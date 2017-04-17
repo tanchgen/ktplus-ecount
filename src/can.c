@@ -328,7 +328,7 @@ void canProcess( void ){
 
 }
 
-void canSendMsg( eMessId msgId, uint32_t data ) {
+void canSendMsg( eMsgId msgId, uint32_t data ) {
 	CanTxMsg canTxMsg;
 	tCanId canId;
 	// Формируем структуру canId
@@ -370,7 +370,7 @@ void getIdList( tCanId *canid, uint32_t extId){
 }
 
 // Для тестов
-void canRecvSimMsg( eMessId msgId, uint32_t data ) {
+void canRecvSimMsg( eMsgId msgId, uint32_t data ) {
   CanTxMsg canTxMsg;
   tCanId canId;
   // Формируем структуру canId

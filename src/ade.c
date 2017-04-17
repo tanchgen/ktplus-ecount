@@ -223,26 +223,28 @@ eAdeState adeIrqHandler( void ){
   if( irqState & IRQENA_Reset ) {
     adeState = ADE_READY;
   }
-  else if( irqState & IRQENA_OIA ) {
-    uint32_t tmpI;
-    // Отправить сообщение на сарвер
-    tmpI = recvI();
-    canSendMsg( CUR_MAX, tmpI );
-    // Выставить управляющий защитой пин в 1
-    CTRL_PORT->BSRR |= CTRL_PIN;
-  }
-  else if( irqState & IRQENA_OV ) {
-    uint32_t tmpV;
-    // Отправить сообщение на сарвер
-    tmpV = recvV();
-    canSendMsg( VOLT_MAX, tmpV );
-    // Выставить управляющий защитой пин в 1
-    CTRL_PORT->BSRR |= CTRL_PIN;
-  }
-  else if( irqState & IRQENA_AEHFA ) {
-    // Отправить сообщение на сарвер
-    ade.tEnergyCount = ade.tEnergy;
-    ade.enrgDay += recvE();
+  else {
+    if( irqState & IRQENA_OIA ) {
+      uint32_t tmpI;
+      // Отправить сообщение на сарвер
+      tmpI = recvI();
+      canSendMsg( CUR_MAX, tmpI );
+      // Выставить управляющий защитой пин в 1
+      CTRL_PORT->BSRR |= CTRL_PIN;
+    }
+    if( irqState & IRQENA_OV ) {
+      uint32_t tmpV;
+      // Отправить сообщение на сарвер
+      tmpV = recvV();
+      canSendMsg( VOLT_MAX, tmpV );
+      // Выставить управляющий защитой пин в 1
+      CTRL_PORT->BSRR |= CTRL_PIN;
+    }
+    if( irqState & IRQENA_AEHFA ) {
+      // Отправить сообщение на сарвер
+      ade.tEnergyCount = ade.tEnergy;
+      ade.enrgDay += recvE();
+    }
   }
 
   // Сброс флагов прерываний
@@ -254,7 +256,7 @@ eAdeState adeIrqHandler( void ){
 eAdeState adeSecondProcess( void ) {
   if( --ade.tWattCount == 0 ){
     ade.tWattCount = ade.tWatt;
-    // Получаем значение мощьности
+    // Получаем значение мощности
     ade.watt = recvW();
     if(ade.watt > ade.maxWattMon){
       ade.maxWattMon = ade.watt;
@@ -262,7 +264,7 @@ eAdeState adeSecondProcess( void ) {
   }
   if( --ade.tSendCount == 0 ){
     ade.tSendCount = ade.tSend;
-    // Отправляем в S207 значение мощьности
+    // Отправляем в S207 значение мощности
     canSendMsg( AWATT_NOW, ade.watt );
   }
   if( --ade.tEnergyCount == 0 ){

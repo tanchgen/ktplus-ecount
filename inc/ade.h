@@ -31,11 +31,11 @@
 //#define ISR_PIN     GPIO_Pin_12
 //#define ISR_PORT    GPIOB
 
-#define ISR_PIN         GPIO_Pin_9
+#define ISR_PIN         GPIO_Pin_12
 #define ISR_PORT        GPIOA
-#define ISR_PIN_NUM     9
+#define ISR_PIN_NUM     12
 #define ISR_PORT_NUM    0 // GPIOA
-#define ISR_EXTI_LINE   EXTI_Line9
+#define ISR_EXTI_LINE   EXTI_Line12
 
 #define CTRL_PIN         GPIO_Pin_8
 #define CTRL_PORT        GPIOA

@@ -31,6 +31,7 @@ uint32_t hexToL( uint8_t *pStr, uint16_t len ){
 	return id;
 }
 
+/*
 int32_t atol( uint8_t *str[] ){
 	int32_t i, l;
 	int8_t sign = 0;
@@ -44,8 +45,8 @@ int32_t atol( uint8_t *str[] ){
 	}
 	return (l*sign);
 }
+*/
 
-/*
 uint32_t atoul( uint8_t str[] ){
 	uint32_t i, l;
 
@@ -59,7 +60,7 @@ uint32_t atoul( uint8_t str[] ){
 	}
 	return (l);
 }
-*/
+
 
 uint8_t lToStr(int32_t l, uint8_t *str ){   // PRINT N IN DECIMAL (RECURSIVE)
    uint8_t nb = 0;
