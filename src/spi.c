@@ -1,46 +1,36 @@
+#include <string.h>
 #include "stm32f10x.h"
-#include "stm32f10x_gpio.h"
-#include "stm32f10x_rcc.h"
-#include "stm32f10x_spi.h"
-#include "stm32f10x_dma.h"
 
 #include "main.h"
+#include "ade.h"
 #include "spi.h"
 #include "buffer.h"
-#include "firmata.h"
 
-#define DMA_TX_ON 0
-//#define DMA_RX_ON
 
-BUFFER_t rxBuffer;
+#define DMA_TX_ON 1
+#define DMA_RX_ON 1
 
-uint8_t rxBuf[BUF_SIZE];
-uint8_t * prx = rxBuf;
-uint8_t txBuf[BUF_SIZE];
-uint8_t * ptx = txBuf;
-
-extern uint8_t rxCplt;
-extern uint8_t txCplt;
 uint8_t testBuf[BUF_SIZE];
-static uint16_t iTx;
 
+uint8_t spiTxBuf[SPI_LEN];
+uint8_t spiRxBuf[SPI_LEN];
+#if ! DMA_TX_ON
+static uint8_t iTx;
+static uint8_t txSize;
+#endif
+#if! DMA_RX_ON
+static uint8_t iRx;
+static uint8_t rxSize;
+#endif
 
 int spiInit(void) {
  
   GPIO_InitTypeDef GPIO_InitStructure;
   SPI_InitTypeDef SPI_InitStructure;  
 
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA , ENABLE);
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-  
-  // ISR Pin - PA9
-  GPIO_InitStructure.GPIO_Pin = ISR_PIN;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  
-  GPIO_Init(ISR_PORT , &GPIO_InitStructure);
-  ISR_PORT->BSRR |= ISR_PIN;
+  RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+  RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
+
 
 /* SPI2_NSS - PB12,
  * SPI2_SCK - PB13,
@@ -73,30 +63,34 @@ int spiInit(void) {
   SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b; // передаем по 8 бит
   SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low; // Полярность и
   SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge; // фаза тактового сигнала
-  SPI_InitStructure.SPI_NSS = SPI_NSS_Hard; // Управлять состоянием сигнала NSS аппаратно
-  SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2; // Предделитель SCK
+  SPI_InitStructure.SPI_NSS = SPI_NSS_Soft; // Управлять состоянием сигнала NSS аппаратно
+  SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_64; // Предделитель SCK
   SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB; // Первым отправляется старший бит
-  SPI_InitStructure.SPI_Mode = SPI_Mode_Slave; // Режим - слейв
+  SPI_InitStructure.SPI_Mode = SPI_Mode_Master; // Режим - мастер
   SPI_InitStructure.SPI_CRCPolynomial = 7;
 
   SPI_Init(SPI2, &SPI_InitStructure); //Настраиваем SPI1
-  
+
 #if DMA_TX_ON
   // Передаем через DMA
-  dmaTxInit( txBuf, BUF_SIZE );
-#endif
-
-#ifdef DMA_RX_ON
-  // Принимаем через DMA
-  dmaRxInit( rxBuf, RX_LEN );
+  dmaTxInit( spiTxBuf, SPI_LEN );
 #else
-  SPI_I2S_ITConfig(SPI2,SPI_I2S_IT_RXNE,ENABLE); //Включаем прерывание по приему байта
-
-  SPI_Cmd(SPI2, ENABLE); // Включаем модуль SPI1....
-
+  SPI_I2S_ITConfig(SPI2,SPI_I2S_IT_TXE,ENABLE); //Включаем прерывание по приему байта
   NVIC_EnableIRQ(SPI2_IRQn); //Разрешаем прерывания от SPI1
 #endif
 
+#if DMA_RX_ON
+  // Принимаем через DMA
+  dmaRxInit( spiRxBuf, SPI_LEN );
+#else
+  SPI_I2S_ITConfig(SPI2,SPI_I2S_IT_RXNE,ENABLE); //Включаем прерывание по приему байта
+
+  NVIC_EnableIRQ(SPI2_IRQn); //Разрешаем прерывания от SPI1
+#endif
+  SPI_Cmd(SPI2, ENABLE); // Включаем модуль SPI1....
+
+  txCplt = SET;
+  rxCplt = SET;
   return 0;
 }
  
@@ -104,40 +98,27 @@ int spiInit(void) {
 
 void SPI2_IRQHandler (void) {
 
-#ifndef DMA_RX_ON
+#if ! ( DMA_RX_ON )
   if( (SPI2->SR & SPI_SR_RXNE) && (SPI2->CR2 & SPI_CR2_RXNEIE) ) {
     // Прерывание вызвано приемом байта ?
-    uint8_t ch;
 
-    ch = SPI2->DR; //Читаем то что пришло
-    if( ch ){
-      BUFFER_Write( &rxBuffer, &ch, 1);
-      if( ch == END_SYSEX ){
-        rxCplt = SET;
-      }
+    spiRxBuf[iRx++] = SPI2->DR; //Читаем то что пришло
+    if( iRx == rxSize ){
+      rxCplt = SET;
+      iRx = 0;
+      SPI_I2S_ITConfig(SPI2,SPI_I2S_IT_RXNE,DISABLE); //Выключаем прерывание по приему байта
     }
   }
 #endif
 
 #if ! DMA_TX_ON
   if( (SPI2->SR & SPI_SR_TXE) && (SPI2->CR2 & SPI_CR2_TXEIE) ) {
-    if( (iTx == 0x200) || (txBuf[iTx-1] == 0xF7) ){
+    if( iTx == txSize){
       txCplt = SET;
-      iTx = 0;
-      // For SPI2 - MISO: PB14
-      ISR_PORT->BSRR |= ISR_PIN;
-      // Reset Pin
-      GPIOB->CRH &= ~(0xF << ((14-8)*4));
-      // Input Floating Pin
-      GPIOB->CRH |= 0x4 << ((14-8)*4);
-      SPI_I2S_ITConfig(SPI2,SPI_I2S_IT_RXNE,ENABLE); //Включаем прерывание по приему байта
       SPI_I2S_ITConfig( SPI2, SPI_I2S_IT_TXE, DISABLE ); //Выключаем прерывание по прередаче байта
     }
     else {
-      SPI2->DR = txBuf[iTx];
-      testBuf[iTx] = txBuf[iTx];
-    // Не больше 511-и
-      iTx++;
+      SPI2->DR = spiTxBuf[iTx++];
     }
   }
 #endif // DMA_TX_ON
@@ -174,12 +155,13 @@ void dmaTxInit(uint8_t * txdata, uint16_t size) {
   DMA_Init(DMA1_Channel5, &dma);
 
   // Связываем DMA с событием окончания передачи
-  SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);
+  SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, DISABLE);
  
   // Прерывание по окончанию передачи DMA
   DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, ENABLE);
   // Включаем прерывание
   NVIC_EnableIRQ(DMA1_Channel5_IRQn);
+  NVIC_SetPriority( DMA1_Channel5_IRQn, 2 );
 }
 
 void dmaRxInit(uint8_t * rxdata, uint16_t size) {
@@ -212,82 +194,116 @@ void dmaRxInit(uint8_t * rxdata, uint16_t size) {
   DMA_Init(DMA1_Channel4, &dma);
  
   // Связываем DMA с событием окончания передачи
-  SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Rx, ENABLE);
+  SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Rx, DISABLE);
  
-  // Прерывание по окончанию передачи DMA
-  DMA_ITConfig(DMA1_Channel4, DMA_IT_TC, ENABLE);
   // Включаем прерывание
   NVIC_EnableIRQ(DMA1_Channel4_IRQn);
+  NVIC_SetPriority( DMA1_Channel4_IRQn, 2 );
 }
 
 void DMA1_Channel4_IRQHandler(void) {
   if (DMA_GetFlagStatus(DMA1_IT_TC4) == SET) {
  
-    // Ждем последний байт
-    while(SPI_I2S_GetFlagStatus(SPI2,SPI_I2S_FLAG_TXE) == RESET);
-    while(SPI_I2S_GetFlagStatus(SPI2,SPI_I2S_FLAG_BSY) == SET);
- 
-    DMA_Cmd(DMA1_Channel4, DISABLE);
-    DMA_ClearITPendingBit(DMA1_IT_TC4);
+    // Останавливаем запросы DMA
+    SPI2->CR2 &= ~SPI_CR2_RXDMAEN;
+
+    // Disable the selected DMAy Channelx
+    DMA1_Channel4->CCR &= ~DMA_CCR1_EN;
+
+    // Clear Transfer Complete IT Flag
+    DMA1->IFCR = (DMA1_IT_GL4 | DMA1_IT_TC4 | DMA1_IT_HT4 | DMA1_IT_TE4 );
     rxCplt = SET;
-//    GPIO_SetBits(GPIOA, GPIO_Pin_4);
   }
  
 }
 
 void DMA1_Channel5_IRQHandler(void) {
-  if (DMA_GetFlagStatus(DMA1_IT_TC4) == SET) {
+  if (DMA_GetFlagStatus(DMA1_IT_TC5) == SET) {
 
     // Ждем последний байт
     while(SPI_I2S_GetFlagStatus(SPI2,SPI_I2S_FLAG_TXE) == RESET);
     while(SPI_I2S_GetFlagStatus(SPI2,SPI_I2S_FLAG_BSY) == SET);
 
+    // Останавливаем запросы DMA
+    SPI2->CR2 &= ~SPI_CR2_TXDMAEN;
+
     DMA_Cmd(DMA1_Channel5, DISABLE);
-    DMA_ClearITPendingBit(DMA1_IT_TC4);
-    txCplt = TRUE;
-    SPI_I2S_ITConfig(SPI2,SPI_I2S_IT_RXNE,ENABLE); //Включаем прерывание по приему байта
-//    GPIO_SetBits(GPIOA, GPIO_Pin_4);
+    // Прерывание по окончанию передачи DMA
+    DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, DISABLE);
+    DMA1->IFCR = (DMA1_IT_GL5 | DMA1_IT_TC5 | DMA1_IT_HT5 | DMA1_IT_TE5 );
+    txCplt = SET;
   }
 
 }
 
 
-void SPI_ReceiveData(uint8_t *data, uint16_t size) {
-//  GPIO_ResetBits(GPIOA, GPIO_Pin_4);
- 
+void SPI_Receive(uint8_t *data, uint16_t size) {
+
+  // Ждем, пока предыдущий сеанс не закончится
+  while( (txCplt != SET) && (rxCplt != SET) )
+  {}
+
+  rxCplt = RESET;
   DMA1_Channel4->CMAR = (uint32_t)data;
   DMA1_Channel4->CNDTR = size;
-  // Начинаем прием
   DMA_Cmd(DMA1_Channel4, ENABLE);
+  // Начинаем прием
+  SPI2->CR2 |= SPI_CR2_RXDMAEN;
 }
 
-void SPI_TransmitData(uint8_t *data, uint16_t size) {
-//  GPIO_ResetBits(GPIOA, GPIO_Pin_4);
-  SPI_I2S_ITConfig(SPI2,SPI_I2S_IT_RXNE,DISABLE); //Выключаем прерывание по приему байта
-  txCplt = FALSE;
+void SPI_Transmit(uint8_t *data, uint16_t size) {
+
+  // Ждем, пока предыдущий сеанс не закончится
+  while( (txCplt != SET) && (rxCplt != SET) )
+  {}
+
+  // Для начала инициализируем прием через DMA
+  txCplt = RESET;
 #if DMA_TX_ON
   DMA1_Channel5->CMAR = (uint32_t)data;
   DMA1_Channel5->CNDTR = size;
-  // Начинаем прием
+  // Прерывание по окончанию передачи DMA
+  DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, ENABLE);
   DMA_Cmd(DMA1_Channel5, ENABLE);
+  // Начинаем передачу
+  SPI2->CR2 |= SPI_CR2_TXDMAEN;
 #else
-  memcpy( txBuf, data, size);
-  txBuf[size] = '\0';
+  memcpy( spiTxBuf, data, size );
+  iTx = 0;
+  txSize = size;
   // Старт передачи
-  SPI2->DR = txBuf[iTx];
-  testBuf[iTx] = txBuf[iTx];
-  iTx++;
-
-  // For SPI2 - MISO: PB14
-  // Reset Pin
-  GPIOB->CRH &= ~(0xF << ((14-8)*4));
-  // Output AF Pull-Push 50MHz Pin
-  GPIOB->CRH |= 0xB << ((14-8)*4);
+  SPI2->DR = spiTxBuf[iTx++];
 
   SPI_I2S_ITConfig( SPI2, SPI_I2S_IT_TXE, ENABLE ); //Включаем прерывание по передаче байта
 #endif
-  // Выставляем прерывание
-  ISR_PORT->BRR |= ISR_PIN;
-
 }
 
+
+void SPI_TransRecv( uint8_t * txData, uint8_t * rxData, uint8_t len ){
+  // Ждем, пока предыдущий сеанс не закончится
+  while( (txCplt != SET) && (rxCplt != SET) )
+  {}
+
+  rxCplt = RESET;
+  txCplt = RESET;
+#if (DMA_RX_ON & DMA_TX_ON)
+  DMA1_Channel4->CMAR = (uint32_t)rxData;
+  DMA1_Channel4->CNDTR = len;
+  DMA_Cmd(DMA1_Channel4, ENABLE);
+  DMA1_Channel5->CMAR = (uint32_t)txData;
+  DMA1_Channel5->CNDTR = len;
+  DMA_Cmd(DMA1_Channel5, ENABLE);
+
+  // Включаем прерывание на RX
+  DMA_ITConfig(DMA1_Channel4, DMA_IT_TC, ENABLE);
+  // Включаем прерывание на TX
+  DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, ENABLE);
+
+  // Начинаем передачу-прием
+  SPI2->CR2 |= (SPI_CR2_TXDMAEN | SPI_CR2_RXDMAEN);
+#else
+  // TODO: Описать передачу-прием без DMA
+  SPI_I2S_ITConfig(SPI2, SPI_I2S_IT_RXNE, ENABLE); //Включаем прерывание по приему байта
+  SPI_I2S_ITConfig(SPI2, SPI_I2S_IT_TXE, ENABLE); //Включаем прерывание по передаче байта
+#endif
+}

@@ -871,7 +871,7 @@ __attribute__((always_inline)) __STATIC_INLINE uint32_t __ROR(uint32_t op1, uint
   \param [in]    value  Value to reverse
   \return               Reversed value
  */
-                                                          /* ToDo:  ARMCC_V6: check if __builtin_arm_rbit is supported */
+/* ToDo:  ARMCC_V6: check if __builtin_arm_rbit is supported */
 __attribute__((always_inline)) __STATIC_INLINE uint32_t __RBIT(uint32_t value)
 {
   uint32_t result;

@@ -41,7 +41,7 @@ timer_sleep (timer_ticks_t ticks)
 }
 
 void
-timer_tick (void)
+timer_tick(void)
 {
   // Decrement to zero the counter used by the delay routine.
   if (timer_delayCount != 0u)

@@ -12,6 +12,9 @@ enum {
   TRUE
 };
 
+extern uint8_t rxCplt;
+extern uint8_t txCplt;
+
 /* Exported functions ------------------------------------------------------- */
 void Error_Handler(void);
 
