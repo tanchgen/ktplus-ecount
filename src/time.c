@@ -275,9 +275,6 @@ void timersProcess( void ) {
 	if ( sysRtc.SecFlag ) {
 		sysRtc.SecFlag = RESET;
 		adeSecondProcess();
-		// Симуляция водомера
-//		flowGetVolume();
-//		flowSecondProcess();
 	}
 
 	// Таймаут для считывания температуры

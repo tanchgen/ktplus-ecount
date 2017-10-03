@@ -129,7 +129,7 @@ typedef enum {							// Условный номер сообщения
 	FLOW_SENS_FAULT,					// Неисправность датчика расходомера
 	DEV_FAULT,								// Нисправность контроллера
 
-} eMessId;
+} eMsgId;
 
 typedef enum {				// Нагревательный/охладительный контур
 	COLD,
@@ -143,7 +143,7 @@ enum _eS207 {
 
 typedef struct {			// Структура CAN-сообщения
 	eCurAdj curAdj;
-	eMessId messId;
+	eMsgId messId;
 	eColdHot coldHot;
 	uint32_t devId;			// Идентификационный номер контроллера ( Serial ID MCU )
 } tIdStruct;
@@ -161,7 +161,7 @@ void canFilterUpdate( tFilter * filter, uint8_t filterNum );
 
 void canProcess( void );
 
-void canSendMsg( eMessId msgId, uint32_t data );
+void canSendMsg( eMsgId msgId, uint32_t data );
 
 void canRx0IrqHandler(void);
 void canRx1IrqHandler(void);

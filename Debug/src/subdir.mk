@@ -8,7 +8,9 @@ C_SRCS += \
 ../src/ade.c \
 ../src/buffer.c \
 ../src/can.c \
+../src/fmt_translate.c \
 ../src/main.c \
+../src/my_uart.c \
 ../src/spi.c \
 ../src/stm32f10x_it.c \
 ../src/time.c 
@@ -18,7 +20,9 @@ OBJS += \
 ./src/ade.o \
 ./src/buffer.o \
 ./src/can.o \
+./src/fmt_translate.o \
 ./src/main.o \
+./src/my_uart.o \
 ./src/spi.o \
 ./src/stm32f10x_it.o \
 ./src/time.o 
@@ -28,7 +32,9 @@ C_DEPS += \
 ./src/ade.d \
 ./src/buffer.d \
 ./src/can.d \
+./src/fmt_translate.d \
 ./src/main.d \
+./src/my_uart.d \
 ./src/spi.d \
 ./src/stm32f10x_it.d \
 ./src/time.d 
